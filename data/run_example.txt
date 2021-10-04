@@ -1,4 +1,4 @@
 conda activate /home/x/xl456/miniconda3_1/envs/torch_py38
 FILE=./10XBC.h5
-python -u run_scDCC_CYCIF.py --n_pairwise 6000 --dir_name test_real_10XBC --n_clusters 10 \
+python -u run_DSSC.py --n_pairwise 6000 --dir_name test_real_10XBC --n_clusters 10 \
 --prediction_file 1 --embedding_file 1 --data_file $FILE --filter 1 --saveFeatures 1
