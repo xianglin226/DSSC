@@ -1,0 +1,340 @@
+import os
+import sys
+import time
+import math
+import scanpy as sc
+from scipy import stats, spatial, sparse
+from scipy.linalg import norm
+from sklearn.metrics.pairwise import euclidean_distances
+import numpy as np
+import random
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+import torch.utils.data as data
+from sklearn.neighbors import kneighbors_graph
+
+def Iscore_gene(y, A):
+    s = sum(sum(A))
+    N = len(y)
+    y_=np.mean(y)
+    y_f = y - y_
+    y_f_1 = y_f.reshape(1,-1)
+    y_f_2 = y_f.reshape(-1,1)
+    r = sum(sum(A*np.dot(y_f_2,y_f_1)))
+    l = sum(y_f**2)
+    s2 = r/l
+    s1 = N/s
+    return s1*s2
+
+def Iscore_label(y, A):
+    s = sum(sum(A))
+    N = len(y)
+    y_1 = y.reshape(1,-1)
+    y_2 = y.reshape(-1,1)
+    y_2 = np.reciprocal(y_2)
+    z = np.dot(y_2,y_1)
+    z[z != 1] = 0
+    r = sum(sum(A*z))
+    s2 = r/N
+    s1 = N/s
+    return s1*s2
+    
+def knn_ACC(p, lab):
+    lab_new = []
+    for i in range(lab.shape[0]):
+        labels = lab[p[i]]
+        l_mode = stats.mode(labels).mode[0]
+        lab_new.append(l_mode)
+    lab_new = np.array(lab_new)
+    return sum(lab == lab_new)/lab.shape[0]
+
+def cluster_acc(y_true, y_pred):
+    """
+    Calculate clustering accuracy. Require scikit-learn installed
+    # Arguments
+        y: true labels, numpy.array with shape `(n_samples,)`
+        y_pred: predicted labels, numpy.array with shape `(n_samples,)`
+    # Return
+        accuracy, in [0,1]
+    """
+    y_true = y_true.astype(np.int64)
+    assert y_pred.size == y_true.size
+    D = max(y_pred.max(), y_true.max()) + 1
+    w = np.zeros((D, D), dtype=np.int64)
+    for i in range(y_pred.size):
+        w[y_pred[i], y_true[i]] += 1
+    from sklearn.utils.linear_assignment_ import linear_assignment
+    ind = linear_assignment(w.max() - w)
+    return sum([w[i, j] for i, j in ind]) * 1.0 / y_pred.size
+
+def GetCluster(X, res, n):
+    adata0=sc.AnnData(X)
+    if adata0.shape[0]>200000:
+       np.random.seed(adata0.shape[0])#set seed 
+       adata0=adata0[np.random.choice(adata0.shape[0],200000,replace=False)] 
+    sc.pp.neighbors(adata0, n_neighbors=n, use_rep="X")
+    sc.tl.louvain(adata0,resolution=res)
+    Y_pred_init=adata0.obs['louvain']
+    Y_pred_init=np.asarray(Y_pred_init,dtype=int)
+    if np.unique(Y_pred_init).shape[0]<=1:
+        #avoid only a cluster
+        exit("Error: There is only a cluster detected. The resolution:"+str(res)+"is too small, please choose a larger resolution!!")
+    else: 
+        print("Estimated n_clusters is: ", np.shape(np.unique(Y_pred_init))[0]) 
+    return(np.shape(np.unique(Y_pred_init))[0])
+
+def torch_PCA(X, k, center=True, scale=False):
+    X = X.t()
+    n,p = X.size()
+    ones = torch.ones(n).cuda().view([n,1])
+    h = ((1/n) * torch.mm(ones, ones.t())) if center else torch.zeros(n*n).view([n,n])
+    H = torch.eye(n).cuda() - h
+    X_center =  torch.mm(H.double(), X.double())
+    covariance = 1/(n-1) * torch.mm(X_center.t(), X_center).view(p,p)
+    scaling = torch.sqrt(1/torch.diag(covariance)).double() if scale else torch.ones(p).cuda().double()
+    scaled_covariance = torch.mm(torch.diag(scaling).view(p,p), covariance)
+    eigenvalues, eigenvectors = torch.eig(scaled_covariance, True)
+    components = (eigenvectors[:, :k])
+    #explained_variance = eigenvalues[:k, 0]
+    return components
+    
+def generate_random_pair_from_location(dist_matrix, num, ml=100, cl=1000):
+    """
+    Generate random pairwise constraints.
+    """
+    ml_ind1, ml_ind2 = [], []
+    cl_ind1, cl_ind2 = [], []
+
+    def check_ind(ind1, ind2, ind_list1, ind_list2):
+        for (l1, l2) in zip(ind_list1, ind_list2):
+                if ind1 == l1 and ind2 == l2:
+                    return True
+        return False
+    
+    def get_dist(data, cell1, cell2):
+         pos1 = data[cell1]
+         pos2 = data[cell2]
+         return np.linalg.norm(pos1 - pos2)
+  
+    k=0
+    num1 = num/2
+    num2 = num/2    
+    while (num1 > 0 or num2 > 0) and k < 1000000:
+        k = k+1
+        tmp1 = random.randint(0, dist_matrix.shape[0] - 1)
+        tmp2 = random.randint(0, dist_matrix.shape[0] - 1)
+        if tmp1 == tmp2:
+            continue
+        if check_ind(tmp1, tmp2, ml_ind1, ml_ind2):
+            continue
+        if get_dist(dist_matrix, tmp1, tmp2) < ml:
+           if num1>0:
+               ml_ind1.append(tmp1)
+               ml_ind2.append(tmp2)
+               num1 -= 1
+        elif get_dist(dist_matrix, tmp1, tmp2) > cl:
+           if num2>0:
+               cl_ind1.append(tmp1)
+               cl_ind2.append(tmp2)
+               num2 -= 1
+        else:
+            continue
+    ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array(ml_ind1), np.array(ml_ind2), np.array(cl_ind1), np.array(cl_ind2)
+    ml_index = np.random.permutation(ml_ind1.shape[0])
+    cl_index = np.random.permutation(cl_ind1.shape[0])
+    ml_ind1 = ml_ind1[ml_index]
+    ml_ind2 = ml_ind2[ml_index]
+    cl_ind1 = cl_ind1[cl_index]
+    cl_ind2 = cl_ind2[cl_index]
+    print("Constraints summary: ML=%.0f, CL=%.0f, K=%.0f" % (len(ml_ind1),len(cl_ind1),k))
+    print(np.shape(ml_ind1))
+    print(np.shape(cl_ind1))
+    print(k)
+    return ml_ind1, ml_ind2, cl_ind1, cl_ind2
+
+
+def generate_random_pair_from_neighbor(neg, num):
+    """
+    Generate random pairwise constraints.
+    """
+    ml_ind1, ml_ind2 = [], []
+    cl_ind1, cl_ind2 = [], []
+
+    def check_ind(ind1, ind2, ind_list1, ind_list2):
+        for (l1, l2) in zip(ind_list1, ind_list2):
+                if ind1 == l1 and ind2 == l2:
+                    return True
+        return False
+  
+    k=0
+    num1 = num
+    num2 = 1  
+    while (num1 > 0 or num2 > 0) and k < 100000000:
+        k = k+1
+        tmp1 = random.randint(0, len(neg) - 1)
+        tmp2 = random.randint(0, len(neg) - 1)
+        if tmp1 == tmp2:
+            continue
+        if check_ind(tmp1, tmp2, ml_ind1, ml_ind2):
+            continue
+        if tmp2 in neg[tmp1] and tmp1 in neg[tmp2]:
+           if num1>0:
+               ml_ind1.append(tmp1)
+               ml_ind2.append(tmp2)
+               num1 -= 1
+        elif tmp2 not in neg[tmp1] and tmp1 not in neg[tmp2]:
+           if num2>0:
+               cl_ind1.append(tmp1)
+               cl_ind2.append(tmp2)
+               num2 -= 1
+        else:
+            continue
+    ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array(ml_ind1), np.array(ml_ind2), np.array(cl_ind1), np.array(cl_ind2)
+    ml_index = np.random.permutation(ml_ind1.shape[0])
+    cl_index = np.random.permutation(cl_ind1.shape[0])
+    ml_ind1 = ml_ind1[ml_index]
+    ml_ind2 = ml_ind2[ml_index]
+    cl_ind1 = cl_ind1[cl_index]
+    cl_ind2 = cl_ind2[cl_index]
+    print("Constraints summary: ML=%.0f, CL=%.0f, K=%.0f" % (len(ml_ind1),len(cl_ind1),k))
+    print(np.shape(ml_ind1))
+    print(np.shape(cl_ind1))
+    print(k)
+    return ml_ind1, ml_ind2, cl_ind1, cl_ind2
+
+def generate_random_pair_from_neighbor2(neg, num, k):
+    """
+    Generate random pairwise constraints.
+    """
+    ml_ind1, ml_ind2 = [], []
+    cl_ind1, cl_ind2 = [], []
+
+    def check_ind(ind1, ind2, ind_list1, ind_list2):
+        for (l1, l2) in zip(ind_list1, ind_list2):
+                if ind1 == l1 and ind2 == l2:
+                    return True
+        return False
+
+    num1 = num
+    while num1 > 0:
+        tmp1 = random.randint(0, len(neg) - 1)
+        tmp2 = random.randint(0, k - 1)
+        cell1 = tmp1
+        cell2 = neg[tmp1][tmp2]
+        if cell1 == cell2:
+            continue
+        if check_ind(cell1, cell2, ml_ind1, ml_ind2):
+            continue
+        if num1>0 and cell1 in neg[cell2]:
+               ml_ind1.append(cell1)
+               ml_ind2.append(cell2)
+               num1 -= 1
+        else:
+            continue
+    ml_ind1, ml_ind2 = np.array(ml_ind1), np.array(ml_ind2)
+    ml_index = np.random.permutation(ml_ind1.shape[0])
+    ml_ind1 = ml_ind1[ml_index]
+    ml_ind2 = ml_ind2[ml_index]
+    print("Constraints summary: ML=%.0f" % (len(ml_ind1)))
+    print(np.shape(ml_ind1))
+    return ml_ind1, ml_ind2
+    
+def knn_ACC(p, lab):
+    lab_new = []
+    for i in range(lab.shape[0]):
+        labels = lab[p[i]]
+        l_mode = stats.mode(labels).mode[0]
+        lab_new.append(l_mode)
+    lab_new = np.array(lab_new)
+    return sum(lab == lab_new)/lab.shape[0]
+    
+def geneSelection(data, threshold=0, atleast=10, 
+                  yoffset=.02, xoffset=5, decay=1.5, n=None, 
+                  plot=True, markers=None, genes=None, figsize=(6,3.5),
+                  markeroffsets=None, labelsize=10, alpha=1, verbose=1):
+    
+    if sparse.issparse(data):
+        zeroRate = 1 - np.squeeze(np.array((data>threshold).mean(axis=0)))
+        A = data.multiply(data>threshold)
+        A.data = np.log2(A.data)
+        meanExpr = np.zeros_like(zeroRate) * np.nan
+        detected = zeroRate < 1
+        meanExpr[detected] = np.squeeze(np.array(A[:,detected].mean(axis=0))) / (1-zeroRate[detected])
+    else:
+        zeroRate = 1 - np.mean(data>threshold, axis=0)
+        meanExpr = np.zeros_like(zeroRate) * np.nan
+        detected = zeroRate < 1
+        mask = data[:,detected]>threshold
+        logs = np.zeros_like(data[:,detected]) * np.nan
+        logs[mask] = np.log2(data[:,detected][mask])
+        meanExpr[detected] = np.nanmean(logs, axis=0)
+
+    lowDetection = np.array(np.sum(data>threshold, axis=0)).squeeze() < atleast
+    zeroRate[lowDetection] = np.nan
+    meanExpr[lowDetection] = np.nan
+            
+    if n is not None:
+        up = 10
+        low = 0
+        for t in range(100):
+            nonan = ~np.isnan(zeroRate)
+            selected = np.zeros_like(zeroRate).astype(bool)
+            selected[nonan] = zeroRate[nonan] > np.exp(-decay*(meanExpr[nonan] - xoffset)) + yoffset
+            if np.sum(selected) == n:
+                break
+            elif np.sum(selected) < n:
+                up = xoffset
+                xoffset = (xoffset + low)/2
+            else:
+                low = xoffset
+                xoffset = (xoffset + up)/2
+        if verbose>0:
+            print('Chosen offset: {:.2f}'.format(xoffset))
+    else:
+        nonan = ~np.isnan(zeroRate)
+        selected = np.zeros_like(zeroRate).astype(bool)
+        selected[nonan] = zeroRate[nonan] > np.exp(-decay*(meanExpr[nonan] - xoffset)) + yoffset
+                
+    if plot:
+        if figsize is not None:
+            plt.figure(figsize=figsize)
+        plt.ylim([0, 1])
+        if threshold>0:
+            plt.xlim([np.log2(threshold), np.ceil(np.nanmax(meanExpr))])
+        else:
+            plt.xlim([0, np.ceil(np.nanmax(meanExpr))])
+        x = np.arange(plt.xlim()[0], plt.xlim()[1]+.1,.1)
+        y = np.exp(-decay*(x - xoffset)) + yoffset
+        if decay==1:
+            plt.text(.4, 0.2, '{} genes selected\ny = exp(-x+{:.2f})+{:.2f}'.format(np.sum(selected),xoffset, yoffset), 
+                     color='k', fontsize=labelsize, transform=plt.gca().transAxes)
+        else:
+            plt.text(.4, 0.2, '{} genes selected\ny = exp(-{:.1f}*(x-{:.2f}))+{:.2f}'.format(np.sum(selected),decay,xoffset, yoffset), 
+                     color='k', fontsize=labelsize, transform=plt.gca().transAxes)
+
+        plt.plot(x, y, color=sns.color_palette()[1], linewidth=2)
+        xy = np.concatenate((np.concatenate((x[:,None],y[:,None]),axis=1), np.array([[plt.xlim()[1], 1]])))
+        t = plt.matplotlib.patches.Polygon(xy, color=sns.color_palette()[1], alpha=.4)
+        plt.gca().add_patch(t)
+        
+        plt.scatter(meanExpr, zeroRate, s=1, alpha=alpha, rasterized=True)
+        if threshold==0:
+            plt.xlabel('Mean log2 nonzero expression')
+            plt.ylabel('Frequency of zero expression')
+        else:
+            plt.xlabel('Mean log2 nonzero expression')
+            plt.ylabel('Frequency of near-zero expression')
+        plt.tight_layout()
+        
+        if markers is not None and genes is not None:
+            if markeroffsets is None:
+                markeroffsets = [(0, 0) for g in markers]
+            for num,g in enumerate(markers):
+                i = np.where(genes==g)[0]
+                plt.scatter(meanExpr[i], zeroRate[i], s=10, color='k')
+                dx, dy = markeroffsets[num]
+                plt.text(meanExpr[i]+dx+.1, zeroRate[i]+dy, g, color='k', fontsize=labelsize)
+    
+    return selected
+
