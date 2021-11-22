@@ -26,10 +26,10 @@ def buildNetwork(layers, type, activation="relu"):
             net.append(nn.Sigmoid())
     return nn.Sequential(*net)
     
-class cycifmodel(nn.Module):
+class Spatialmodel(nn.Module):
     def __init__(self, input_dim, z_dim, neg, encodeLayer=[], decodeLayer=[],
             activation="relu", sigma=1., alpha=1., gamma=1., ml_weight=1., fi=0.0001, cutoff=0.5):
-        super(cycifmodel, self).__init__()
+        super(Spatialmodel, self).__init__()
         self.cutoff = cutoff
         self.activation = activation
         self.neg = neg
