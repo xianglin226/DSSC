@@ -16,7 +16,7 @@ import collections
 import h5py
 from preprocess import read_dataset, normalize
 from scipy import stats, spatial
-from scDCC_CYCIF import cycifmodel
+from DSSC import Spatialmodel
 import sys
 
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     ml_ind2 = ml_ind2_1
     
     #Build model
-    model = cycifmodel(input_dim=input_size, z_dim=32, neg=p_,
+    model = Spatialmodel(input_dim=input_size, z_dim=32, neg=p_,
             encodeLayer=[256,64], decodeLayer=[64,256], sigma=args.sigma, gamma=args.gamma,
             ml_weight=args.weight_ml).cuda()
 
