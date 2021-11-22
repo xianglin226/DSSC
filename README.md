@@ -14,4 +14,6 @@ Numpy 1.18.1
 
 h5py 2.9.0
 
+munkres 1.1.4  
+
 All experiments of scMDC in this study are conducted on Nvidia Tesla P100 (16G) GPU.
