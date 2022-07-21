@@ -1,4 +1,5 @@
-#The input data should be in h5 format with:  
+# Input 
+The input data should be in h5 format with:  
 (1) "X" - count matrix  
 (2) "Y" - true labels  
 (3) "Pos" - spatial coordinate  
