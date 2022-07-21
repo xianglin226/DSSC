@@ -21,7 +21,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='train',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--data_file', default='sample_151676.h5')
+    parser.add_argument('--data_file', default='sample_151507.h5')
     parser.add_argument('--select_genes', default=1000, type=int)
     parser.add_argument('--knn', default=20, type=int)
     parser.add_argument('--train_iter', default=400, type=int)
