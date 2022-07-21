@@ -1,7 +1,7 @@
 # DSSC
 A model-based constrained deep learning clustering approach for spatial-resolved single-cell data
 
-![alt text](https://github.com/xianglin226/DSSC/blob/master/data/fig1.tif)
+![alt text](https://github.com/xianglin226/DSSC/blob/master/data/fig1.png)
 
 # Packages
 Python 3.8.1
