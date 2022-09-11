@@ -6,31 +6,21 @@ from preprocess import read_dataset, normalize
 from sklearn.neighbors import kneighbors_graph
 
 #x is the count matrix; 
-#y is the label; 
 #Loc is the spatial coordinates
+#Here we use the sample 151507 as an example, y is just used to remove unknown cells
 sample = "151507"
 n_features = 2000
 data_mat = h5py.File('./sample_' + sample + '_anno.h5')
 x = np.array(data_mat['X'])
 y0 = np.array(data_mat['Y'])
-
 loc = np.array(data_mat["Pos"])
 loc = np.transpose(loc)
 data_mat.close()
 
 #remove the spots with NA labels
 f = np.where(y0.astype(np.str) != "NA")[0]
-y0 = y0[f]
 x = x[f,:]
 loc = loc[f,:]
-
-loc = loc.astype(np.float)
-u = np.unique(y0)
-y=[]
-for i in range(len(y0)):
-    a = np.where(u == y0[i])[0][0]
-    y.append(a)
-y = np.array(y)
 
 #build knn graph
 A = kneighbors_graph(loc, 30, mode="connectivity", metric="euclidean", include_self=False, n_jobs=-1)
