@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print(args)
+    ###read data
     data_mat = h5py.File(args.data_file)
     x = np.array(data_mat['X'])
     pos = np.array(data_mat['Pos'])
@@ -70,12 +71,14 @@ if __name__ == "__main__":
     y = np.array(data_mat['Y'])
     data_mat.close()
     
+    ###remove NA cells
     f = np.where(y.astype(np.str) != "NA")[0]
     y = y[f]
     x = x[f,:]
     pos = pos[f,:]
     pos = pos.astype(np.float)
     
+    ###Cluster number defined by user or calculated from y (if availble)
     if args.n_clusters == -1:
         n_clusters = np.shape(np.unique(y))[0]
     else:
@@ -84,7 +87,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
         
-    #Filter
+    #read gene filter file 
     filter = np.loadtxt("realdata/sample_" + args.sample + "_featureSelection_Index2000.csv")
     filter = filter.astype(np.int)   
     x = x[:,filter]      
@@ -117,14 +120,15 @@ if __name__ == "__main__":
     A_n = norm_adj(A)
     
     #Get kneighbors_graph from spatial dist (this is just for evaluation)
-    k0 = 20
+    k0 = 20 #we now use a k=20 graph to evaluate
+    A0 = kneighbors_graph(pos_, k0, mode="connectivity", metric="euclidean", include_self=False, n_jobs=-1)
+    A0 = A0.toarray()
+    
     dist = spatial.distance_matrix(pos_,pos_)
     p_ = []
     for i in range(dist.shape[0]):
         idx = np.argpartition(dist[i], k0)[:k0]
         p_.append(idx)
-    A0 = kneighbors_graph(pos_, k0, mode="connectivity", metric="euclidean", include_self=False, n_jobs=-1)
-    A0 = A0.toarray()
 
     ###############################################################################################################
     print("***Building constraints***")
@@ -160,19 +164,17 @@ if __name__ == "__main__":
             n_clusters = n_clusters, num_epochs=args.clustering_iters, y=y, n_ml = args.n_ml, n_cl = args.n_cl,
             ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, ml_p=args.weight_ml, cl_p=args.weight_cl,
             p_=p_, lr = args.lr, update_interval=1, tol=0.001, save_dir=args.save_dir)
-    
+
     t1 = time()
     print("Time used is:" + str(t1-t0))
-
-    A = A.toarray()
+    
     acc, nmi, ari = eval_cluster(y, y_pred)
     Iscore = Iscore_label(y_pred+1., A0)
     ka = knn_ACC(p_, y_pred)
     print('Final Clustering: ACC= %.4f, NMI= %.4f, ARI= %.4f, kNN_ACC= %.4f, I_score= %.4f, Loss = %.8f, Epoch = %.i' % (acc, nmi, ari, ka, Iscore, final_loss, epoch))
     
-    final_latent = model.encodeBatch(torch.tensor(adata.X, dtype=torch.float32), A_n).data.cpu().numpy()
-
     if args.final_latent_file != -1:
+         final_latent = model.encodeBatch(torch.tensor(adata.X, dtype=torch.float32), A_n).data.cpu().numpy()
          np.savetxt(args.save_dir + "/" + args.final_latent_file + "_" + str(args.run), final_latent, delimiter=",")   
     if args.final_labels != -1:
          np.savetxt(args.save_dir + "/" + args.final_labels + "_" + str(args.run), y_pred, delimiter=",")
