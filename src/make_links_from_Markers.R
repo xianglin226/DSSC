@@ -1,4 +1,3 @@
-library(Rtsne)
 library(ggplot2)
 library(Seurat)
 library(rhdf5)
@@ -26,16 +25,16 @@ k <- nng(as.data.frame(pos),k=6)
 knn <- as_adjacency_matrix(k)
 
 #normalize counts
-x_n <- NormalizeData(x)
+x_n <- NormalizeData(x) # can be normalized by other methods.
 
 #extract the marker genes
 #This example is for 151507;
-#Marker genes from the paper of spatialLIBD
+#Marker genes are from the paper of spatialLIBD; more marker genes can be added according to the prior knowledge.
 genelist = c("FABP7","PCP4","MOBP","AQP4")
-#Layers represented by each marker
+#Layers represented by each marker (or celltypes for other datasets)
 layers = c("Layer1","Layer5","WM","Layer1")
 
-#make link candidates
+#make link candidates, the cutoff value (0.9 and 0.5) can be changed.
 cans <- data.frame()
 for (k in 1:length(genelist)) {
   gene <- genelist[k]
@@ -44,8 +43,8 @@ for (k in 1:length(genelist)) {
   for (i in 1:length(g)) {
     ind <- c(i,which(knn[i,]==1))
     g_[i] <- mean(g[ind])
-  }
-  cutoff <- quantile(g_, 0.90)
+  } # genes are smoothed by the spatially neighbor cells
+  cutoff <- quantile(g_, 0.90) # cutoff 1
   hit <- ifelse(g_>cutoff,1,0)
   rate <- c()
   for (i in 1:nrow(pos)) {
@@ -53,7 +52,7 @@ for (k in 1:length(genelist)) {
     hit_ <- hit[neb==1]
     rate[i] <- sum(hit_)/length(hit_)
   }
-  hit2 <- ifelse(rate>0.5,1,0)
+  hit2 <- ifelse(rate>0.5,1,0) #cutoff 2
   if(sum(hit2)==0){
     next
   }
@@ -61,9 +60,9 @@ for (k in 1:length(genelist)) {
   cans <- rbind(cans,df)
 }
 
-write.table(cans,paste0("LinksFromMarks_",sample,".txt"), col.names = F,row.names = F,quote = F)
+#write.table(cans,paste0("LinksFromMarks_",sample,".txt"), col.names = F,row.names = F,quote = F)
 
-#mk ml
+#make must-link and cannot-link
 ml1 <- c()
 ml2 <- c()
 cl1 <- c()
@@ -95,16 +94,18 @@ cl_df <- t(apply(cl_df, 1, sort))
 ml_df <- ml_df[!duplicated(ml_df),]
 cl_df <- cl_df[!duplicated(cl_df),]
 
-check_labels1 <- function(cells){
-  sum(y[cells[1]]==y[cells[2]])
+#check the accuracy of constraints when the true labels are available
+if(!is.null(y)){
+   check_labels1 <- function(cells){
+     sum(y[cells[1]]==y[cells[2]])
+     }
+
+   check_labels2 <- function(cells){
+     sum(y[cells[1]]!=y[cells[2]])
+     }
+
+   print(sum(apply(ml_df, 1, check_labels1))/nrow(ml_df))
+   print(sum(apply(cl_df, 1, check_labels2))/nrow(cl_df))
 }
-
-check_labels2 <- function(cells){
-  sum(y[cells[1]]!=y[cells[2]])
-}
-
-sum(apply(ml_df, 1, check_labels1))/nrow(ml_df)
-sum(apply(cl_df, 1, check_labels2))/nrow(cl_df)
-
 write.table(ml_df,paste0("sample_",sample,"_mlFromMarks.txt"), col.names = F,row.names = F,quote = F)
 write.table(cl_df,paste0("sample_",sample,"_clFromMarks.txt"), col.names = F,row.names = F,quote = F)
