@@ -296,17 +296,18 @@ class DSSC(nn.Module):
                     break
                     
             #update links
-            if epoch%1 == 0:
+            if epoch%update_ml == 0:
             #update ml            
                inds = np.random.choice(ml_pool1.shape[0], n_ml, replace=False)
                ml_ind1 = ml_pool1[inds]
-               ml_ind2 = ml_pool2[inds]           
+               ml_ind2 = ml_pool2[inds]   
+            if epoch%update_cl == 0:
             #update cl
                inds = np.random.choice(cl_pool1.shape[0], n_cl, replace=False)
                cl_ind1 = cl_pool1[inds]
                cl_ind2 = cl_pool2[inds]
                     
-            #Clustering
+            #update clustering
             self.train()
             target = Variable(p).to(self.device)
             _, qbatch, mean_tensor, disp_tensor, pi_tensor = self.aeForward2(G_v, X_v)
@@ -319,7 +320,7 @@ class DSSC(nn.Module):
             optim_adam.step()
             total_loss = loss_zinb.data/num + loss_cluster.data/num            
             
-            #ML links
+            #update links
             _, qbatch, mean_tensor, disp_tensor, pi_tensor = self.aeForward2(G_v, X_v)
             loss_zinb = self.zinb_loss(x=X_raw_v, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor, scale_factor=X_sf_v)
             ml_q1 = qbatch[ml_ind1]
@@ -328,7 +329,7 @@ class DSSC(nn.Module):
             cl_q1 = qbatch[cl_ind1]
             cl_q2 = qbatch[cl_ind2]
             cl_loss = self.pairwise_loss(cl_q1, cl_q2, "CL")
-            loss = ml_p * ml_loss + cl_p * cl_loss + loss_zinb#1 * 0.5 + loss_zinb2 * 0.5
+            loss = ml_p * ml_loss + cl_p * cl_loss + loss_zinb
             optim_adam.zero_grad()
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(self.mu, 1)
