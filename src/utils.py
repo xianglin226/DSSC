@@ -96,6 +96,9 @@ def knn_ACC(p, lab):
     lab_new = np.array(lab_new)
     return sum(lab == lab_new)/lab.shape[0]
 
+###################################################################################
+###Some functions to build constraints in python
+
 def generate_random_pair_from_markers(m):
     """
     Generate random pairwise constraints.
