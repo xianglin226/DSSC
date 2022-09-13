@@ -2,7 +2,7 @@ import scanpy as sc
 import h5py
 import numpy as np
 from utils import *
-from preprocess import read_dataset, normalize
+from preprocess0 import read_dataset, normalize
 from sklearn.neighbors import kneighbors_graph
 
 #x is the count matrix; 
