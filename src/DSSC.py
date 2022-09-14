@@ -338,3 +338,4 @@ class DSSC(nn.Module):
                       total_loss, loss_zinb.data/num, loss_cluster.data/num, ml_loss.data/ml_num, cl_loss.data/cl_num))
 
         return self.y_pred, total_loss, epoch+1
+
