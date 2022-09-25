@@ -10,8 +10,8 @@ from joblib import Parallel, delayed
 #Loc is the spatial coordinates
 #Here we use the sample 151507 as an example, y is just used to remove unknown cells
 sample = '151507'
-inputfile = './sample_data/sample_' + sample + '_anno.h5'
-n_features = 2000
+inputfile = '../sample_data/sample_' + sample + '_anno.h5'
+n_features = 4000
 data_mat = h5py.File(inputfile)
 x = np.array(data_mat['X'])
 y0 = np.array(data_mat['Y'])
@@ -60,5 +60,5 @@ score = Parallel(n_jobs=64)(delayed(getindex)(i) for i in range(adata0.X.shape[1
 score_ = np.argpartition(score, -n_features)[-n_features:]
 
 #output the index of the HVGs
-np.savetxt("sample_" + sample + "_featureSelection_Index2000.csv", score_, delimiter="\t")
+np.savetxt("sample_" + sample + "_featureSelection_Index4000.csv", score_, delimiter="\t")
 
