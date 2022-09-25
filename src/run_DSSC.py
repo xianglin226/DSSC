@@ -4,16 +4,14 @@ from DSSC import DSSC
 import numpy as np
 from sklearn import metrics
 from sklearn.neighbors import kneighbors_graph
-from sklearn.metrics import accuracy_score, normalized_mutual_info_score, adjusted_rand_score
 from scipy import sparse
 import h5py
 import pandas as pd
 import scanpy as sc
 import torch
-from preprocess import concat_data, preprocessing_rna, norm_adj, SNN_adj, pearson_residuals
+from preprocess import concat_data, preprocessing_rna, norm_adj 
 from utils import *
 from scipy import stats, spatial
-import scipy.sparse as ssp
 
 if __name__ == "__main__":
 
@@ -23,9 +21,9 @@ if __name__ == "__main__":
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--data_file', default='sample_151507.h5', help = 'input data file')
     parser.add_argument('--FS_file', default="realdata/sample_151507_featureSelection_Index2000.csv", help='Spatial-based feature selection file')
-    parser.add_argument('--select_genes', default=1000, type=int, help = 'number of HVGs used in clustering')
+    parser.add_argument('--select_genes', default=2000, type=int, help = 'number of HVGs used in clustering')
     parser.add_argument('--knn', default=20, type=int, help = 'K value for building KNN graph')
-    parser.add_argument('--train_iter', default=400, type=int, help = 'iterations of pretraining')
+    parser.add_argument('--train_iter', default=200, type=int, help = 'iterations of pretraining')
     parser.add_argument('--n_clusters', default=-1, type=int, help = 'number of clusters')
     parser.add_argument('--lr', default=0.001, type=float, help = 'learning rate')
     parser.add_argument('--dropoutE', default=0., type=float, help='dropout probability for encoder')
@@ -40,12 +38,12 @@ if __name__ == "__main__":
     parser.add_argument('--final_latent_file', default=-1, help = 'file name for the output of the embedding layer; -1 for no output')
     parser.add_argument('--final_labels', default=-1, help = 'file name for the output of the predicted label; -1 for no output')
     parser.add_argument('--device', default='cuda')
-    parser.add_argument('--n_ml', default=2000, type=int, help='number of must-link loss used in each training')
-    parser.add_argument('--weight_ml', default = 1., type = float, help = 'weight controls ml loss')
+    parser.add_argument('--n_ml', default=4000, type=int, help='number of must-link loss used in each training')
+    parser.add_argument('--weight_ml', default = .5, type = float, help = 'weight controls ml loss')
     parser.add_argument('--n_cl', default=4000, type=int, help='number of cannot-link loss used in each training')
     parser.add_argument('--weight_cl', default = 1., type = float, help = 'weight controls cl loss')
     parser.add_argument('--gamma', default=0.01, type=float, help='coefficient of clustering loss')
-    parser.add_argument('--clustering_iters', default=200, type=int, help='iteration of clustering stage')
+    parser.add_argument('--clustering_iters', default=400, type=int, help='iteration of clustering stage')
     parser.add_argument('--act', default="Adam", help='activation function')
     parser.add_argument('--sigma', default=0.1, type=float, help='noise added on data for denoising autoencoder')
     parser.add_argument('--ml_file', default=-1, help='the file of must-link')
@@ -78,10 +76,10 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
         
-    ###read gene filter file 
-    filter = np.loadtxt(args.FS_file) # read featureselection file here
-    filter = filter.astype(np.int)   
-    x = x[:,filter]
+    ###read gene filter file (optional)
+    #filter = np.loadtxt(args.FS_file) # read featureselection file here
+    #filter = filter.astype(np.int)   
+    #x = x[:,filter]
 
     ###preprocessing scRNA-seq read counts matrix
     print("***Data prepocessing***")
