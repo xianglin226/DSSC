@@ -1,4 +1,3 @@
-from sklearn.metrics import pairwise_distances
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -15,7 +14,6 @@ import dgl
 from dgl.nn.pytorch.conv import GraphConv, TAGConv, GATConv
 from utils import *
 from sklearn.cluster import KMeans
-from sklearn.neighbors import kneighbors_graph
 
 eps = 1e-10
 MAX_LOGVAR = 15
@@ -79,8 +77,8 @@ class GATEncoder(nn.Module):
         return mean
 
 class DSSC(nn.Module):
-    def __init__(self, input_dim, encodeLayer=[], decodeLayer=[], encodeHead=10, encodeConcat=False, 
-            activation='elu', z_dim=2, alpha=1., gamma=0.1, sigma=0.1,
+    def __init__(self, input_dim, encodeLayer=[], decodeLayer=[], encodeHead=3, encodeConcat=False, 
+            activation='elu', z_dim=32, alpha=1., gamma=0.1, sigma=0.1,
             dropoutE=0., dropoutD=0., device="cuda"):
         super(DSSC, self).__init__()
         self.alpha = alpha
@@ -150,7 +148,7 @@ class DSSC(nn.Module):
         mu = self.encodeForward(G_v, X_v)
         return mu.data
 
-    def train_model(self, X, A_n, A, X_raw, size_factor, lr=0.001, train_iter=400, subgraph_repeats=1, patience=20, verbose=True, save_dir=""):
+    def train_model(self, X, A_n, A, X_raw, size_factor, lr=0.001, train_iter=400, verbose=True, save_dir=""):
         X = torch.tensor(X, dtype=torch.float32)
         G = dgl.from_scipy(A_n)
         G.ndata['feat'] = X
@@ -316,26 +314,39 @@ class DSSC(nn.Module):
             loss = loss_zinb + self.gamma * loss_cluster
             optim_adam.zero_grad()
             loss.backward()
-            #torch.nn.utils.clip_grad_norm_(self.mu, 1)
+            torch.nn.utils.clip_grad_norm_(self.mu, 1)
             optim_adam.step()
             total_loss = loss_zinb.data/num + loss_cluster.data/num            
-            
+                      
             #update links
-            _, qbatch, mean_tensor, disp_tensor, pi_tensor = self.aeForward2(G_v, X_v)
-            loss_zinb = self.zinb_loss(x=X_raw_v, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor, scale_factor=X_sf_v)
-            ml_q1 = qbatch[ml_ind1]
-            ml_q2 = qbatch[ml_ind2]
-            ml_loss = self.pairwise_loss(ml_q1, ml_q2, "ML")
-            cl_q1 = qbatch[cl_ind1]
-            cl_q2 = qbatch[cl_ind2]
-            cl_loss = self.pairwise_loss(cl_q1, cl_q2, "CL")
-            loss = ml_p * ml_loss + cl_p * cl_loss + loss_zinb
-            optim_adam.zero_grad()
-            loss.backward()
-            #torch.nn.utils.clip_grad_norm_(self.mu, 1)
-            optim_adam.step()
-            print('Clustering Iteration:{}, Total loss:{:.8f}, ZINB loss:{:.8f}, Cluster loss:{:.8f}, ML loss:{:.8f} , CL loss:{:.8f}'.format(epoch+1, 
-                      total_loss, loss_zinb.data/num, loss_cluster.data/num, ml_loss.data/ml_num, cl_loss.data/cl_num))
+            if epoch%2==0:
+              _, qbatch, mean_tensor, disp_tensor, pi_tensor = self.aeForward2(G_v, X_v)
+              loss_zinb = self.zinb_loss(x=X_raw_v, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor, scale_factor=X_sf_v)
+              ml_q1 = qbatch[ml_ind1]
+              ml_q2 = qbatch[ml_ind2]
+              ml_loss = self.pairwise_loss(ml_q1, ml_q2, "ML")
+              loss = ml_p * ml_loss + loss_zinb
+              optim_adam.zero_grad()
+              loss.backward()
+              torch.nn.utils.clip_grad_norm_(self.mu, 1)
+              optim_adam.step()
+              total_loss = loss_zinb.data/num + loss_cluster.data/num + ml_loss.data/ml_num
+              print('Clustering Iteration:{}, Total loss:{:.8f}, ZINB loss:{:.8f}, Cluster loss:{:.8f}, ML loss:{:.8f}'.format(epoch+1, 
+                      total_loss, loss_zinb.data/num, loss_cluster.data/num, ml_loss.data/ml_num))
+
+            else:
+              _, qbatch, mean_tensor, disp_tensor, pi_tensor = self.aeForward2(G_v, X_v)
+              loss_zinb = self.zinb_loss(x=X_raw_v, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor, scale_factor=X_sf_v)
+              cl_q1 = qbatch[cl_ind1]
+              cl_q2 = qbatch[cl_ind2]
+              cl_loss = self.pairwise_loss(cl_q1, cl_q2, "CL")
+              loss = cl_p * cl_loss + loss_zinb
+              optim_adam.zero_grad()
+              loss.backward()
+              torch.nn.utils.clip_grad_norm_(self.mu, 1)
+              optim_adam.step()
+              total_loss = loss_zinb.data/num + loss_cluster.data/num + cl_loss.data/cl_num
+              print('Clustering Iteration:{}, Total loss:{:.8f}, ZINB loss:{:.8f}, Cluster loss:{:.8f}, CL loss:{:.8f}'.format(epoch+1, 
+                      total_loss, loss_zinb.data/num, loss_cluster.data/num, cl_loss.data/cl_num))
 
         return self.y_pred, total_loss, epoch+1
-
