@@ -78,8 +78,7 @@ class GATEncoder(nn.Module):
 
 class DSSC(nn.Module):
     def __init__(self, input_dim, encodeLayer=[], decodeLayer=[], encodeHead=3, encodeConcat=False, 
-            activation='elu', z_dim=32, alpha=1., gamma=0.1, sigma=0.1,
-            dropoutE=0., dropoutD=0., device="cuda"):
+            activation='elu', z_dim=32, alpha=1., gamma=0.1, sigma=0.1, device="cuda"):
         super(DSSC, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -91,10 +90,8 @@ class DSSC(nn.Module):
         self.z_dim = z_dim
         self.num_encoderLayer = len(encodeLayer)+1
         self.activation = activation
-        self.dropoutE = dropoutE
-        self.dropoutD = dropoutD
-        self.encoder = GATEncoder(input_dim=input_dim, hidden_dims=encodeLayer, output_dim=z_dim, num_heads=encodeHead, dropout=dropoutE)
-        self.decoder = buildNetwork([z_dim]+decodeLayer, activation=activation, dropout=dropoutD)
+        self.encoder = GATEncoder(input_dim=input_dim, hidden_dims=encodeLayer, output_dim=z_dim, num_heads=encodeHead, dropout=0.)
+        self.decoder = buildNetwork([z_dim]+decodeLayer, activation=activation, dropout=0.)
         self._dec_mean = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), MeanAct())
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
         self._dec_pi = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), nn.Sigmoid())
@@ -148,7 +145,7 @@ class DSSC(nn.Module):
         mu = self.encodeForward(G_v, X_v)
         return mu.data
 
-    def train_model(self, X, A_n, A, X_raw, size_factor, lr=0.001, train_iter=400, verbose=True, save_dir=""):
+    def train_model(self, X, A_n, A, X_raw, size_factor, lr=0.001, train_iter=400, verbose=True):
         X = torch.tensor(X, dtype=torch.float32)
         G = dgl.from_scipy(A_n)
         G.ndata['feat'] = X
@@ -203,19 +200,10 @@ class DSSC(nn.Module):
         q = q**((self.alpha+1.0)/2.0)
         q = (q.t() / torch.sum(q, dim=1)).t()
         return q
-    
-    def getcenter(self, z, y):
-        clus = np.unique(y)
-        center = []
-        for i in clus:
-           z_ = z[y==i]
-           cent = np.mean(z_,axis=0)
-           center.append(cent)
-        return np.array(center)
 
     def fit(self, X, X_raw, X_sf, A, A_n, n_clusters,
             p_, n_ml=0, n_cl=0, ml_ind1=np.array([]), ml_ind2=np.array([]), cl_ind1=np.array([]), cl_ind2=np.array([]),
-            ml_p=1., cl_p=1., y=None, lr=0.001, batch_size=256, num_epochs=1, update_interval=1, tol=1e-3, save_dir="", verbose=True):
+            ml_p=1., cl_p=1., y=None, lr=0.001, batch_size=256, num_epochs=1, update_interval=1, tol=1e-3):
         '''X: tensor data'''
         
         X = torch.tensor(X, dtype=torch.float32)
