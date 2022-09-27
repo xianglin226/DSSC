@@ -26,8 +26,6 @@ if __name__ == "__main__":
     parser.add_argument('--train_iter', default=200, type=int, help = 'iterations of pretraining')
     parser.add_argument('--n_clusters', default=-1, type=int, help = 'number of clusters')
     parser.add_argument('--lr', default=0.001, type=float, help = 'learning rate')
-    parser.add_argument('--dropoutE', default=0., type=float, help='dropout probability for encoder')
-    parser.add_argument('--dropoutD', default=0., type=float, help='dropout probability for decoder')
     parser.add_argument('--encodeLayer', nargs="+", default=[128], type=int, help = 'encoder layer size')
     parser.add_argument('--decodeLayer', nargs="+", default=[128], type=int, help = 'decoder layer size')
     parser.add_argument('--encodeHead', default=3, type=int, help = 'number of encoder heads')
@@ -44,7 +42,6 @@ if __name__ == "__main__":
     parser.add_argument('--weight_cl', default = 1., type = float, help = 'weight controls cl loss')
     parser.add_argument('--gamma', default=0.01, type=float, help='coefficient of clustering loss')
     parser.add_argument('--clustering_iters', default=400, type=int, help='iteration of clustering stage')
-    parser.add_argument('--act', default="Adam", help='activation function')
     parser.add_argument('--sigma', default=0.1, type=float, help='noise added on data for denoising autoencoder')
     parser.add_argument('--ml_file', default=-1, help='the file of must-link')
     parser.add_argument('--cl_file', default=-1, help='the file of cannot-link')
@@ -136,23 +133,21 @@ if __name__ == "__main__":
     
     ###build model
     model = DSSC(input_dim=adata.n_vars, encodeLayer=args.encodeLayer, decodeLayer=args.decodeLayer, encodeHead=args.encodeHead, 
-            encodeConcat=args.concat, gamma=args.gamma, activation="elu", z_dim=args.z_dim, sigma = args.sigma,
-            dropoutE=args.dropoutE, dropoutD=args.dropoutD, device=args.device).to(args.device)
+            encodeConcat=args.concat, gamma=args.gamma, activation="elu", z_dim=args.z_dim, sigma = args.sigma, device=args.device).to(args.device)
 
     print(str(model))
 
     t0 = time()
     
     ###pretraining stage   
-    model.train_model(adata.X, A_n, A, count_X, adata.obs.size_factors, 
-                    lr=args.lr, train_iter=args.train_iter, verbose=True, save_dir=args.save_dir)
+    model.train_model(adata.X, A_n, A, count_X, adata.obs.size_factors, lr=args.lr, train_iter=args.train_iter, verbose=args.verbose)
     print('Pret-raining time: %d seconds.' % int(time() - t0))
     
     ###clustering stage
     y_pred, final_loss, epoch = model.fit(X=adata.X, X_raw = count_X, X_sf=adata.obs.size_factors, A = A, A_n = A_n,
             n_clusters = n_clusters, num_epochs=args.clustering_iters, y=y, n_ml = args.n_ml, n_cl = args.n_cl,
             ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, ml_p=args.weight_ml, cl_p=args.weight_cl,
-            p_=p_, lr = args.lr, update_interval=1, tol=0.001, save_dir=args.save_dir)
+            p_=p_, lr = args.lr, update_interval=1, tol=0.001)
 
     t1 = time()
     print("Time used is:" + str(t1-t0))
