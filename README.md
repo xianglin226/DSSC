@@ -22,10 +22,10 @@ All experiments of DSSC in this study are conducted on Nvidia Tesla P100 (16G) G
 
 #The input data should be in h5 format with:  
 (1) "X" - count matrix  
-(2) "Y" - true labels  
+(2) "Y" - true labels (if available)  
 (3) "Pos" - spatial coordinate  
 (4) "Genes" - feature names (Use to build constraints)  
 
 # Run DSSC 
 1) Build constraints (See make_links_from_Markers.R)  
-2) Run DSSC (See run.sh)  
+2) Run DSSC (See run_DSSC.sh, then run.sh)  
