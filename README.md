@@ -35,6 +35,8 @@ cccd 1.5
 
 rhdf5 2.38.1  
 
+ggplot2 3.3.6  
+
 # Run DSSC 
 1) Build constraints (See make_links_from_Markers.R)  
 2) Run DSSC (See run_DSSC.sh, then run.sh)  
