@@ -3,10 +3,11 @@ library(Seurat)
 library(rhdf5)
 library(openxlsx)
 library(cccd)
-sample <- "151507"
-dat <- H5Fopen(paste0("../sample_data/sample_",sample,"_anno.h5"))
 
 ##read data
+#load data prepared in h5 format
+dat <- H5Fopen(paste0("../sample_data/sample_151507_anno.h5"))
+
 #X is count matrix; Y is the label; Pos is the spatial coordinates.
 y <- dat$Y
 genes <- dat$Gene
@@ -14,7 +15,7 @@ x <- dat$X
 rownames(x) <- genes
 pos <- dat$Pos
 
-#Filter out the spots with NA labels
+#Filter out the spots with NA labels (this is only for the spatialLIBD data)
 f <- is.na(y)
 x <- x[,!f]
 y <- y[!f]
@@ -28,17 +29,17 @@ knn <- as_adjacency_matrix(k)
 x_n <- NormalizeData(x) # can be normalized by other methods.
 
 #extract the marker genes
-#This example is for 151507;
+#This example is for spatialLIBD 151507;
 
 genelist = c("FABP7","PCP4","MOBP","AQP4")
 #Layers represented by each marker (or celltypes for other datasets)
 layers = c("Layer1","Layer5","WM","Layer1")
-#whether to get high (1) or low (2) expression cells
+#whether to get high (1) or low (2) expressed cells
 att = c(1,1,1,1)
 
 #Marker genes are from the paper of spatialLIBD
-#such as PCP4 (Layer5), MOBP (WM), AQP4 (Layer1), FABP4 (Layer1), CARTPT(Layer3), ENC1(WN), KRT17(Layer6),... can be used
-#more marker genes can be added according to the prior knowledge.
+#such as PCP4 (Layer5), MOBP (WM), AQP4 (Layer1), FABP4 (Layer1), CARTPT(Layer3), ENC1(WN), KRT17(Layer6),...
+#This is a flexible approach, more marker genes can be added according to the prior knowledge.
 #the spatial dependency can be tested by using the function below, it is not suggested to use a gene with low spatial dependency.
 #It is also suggested to check the distribution of gene before using as markers (see the codes at bottom).
 ######################################################################################
@@ -67,6 +68,8 @@ for (i in genelist) {
 ############################################################
 #make link candidates, the cutoff value (0.9 and 0.5) can be changed to adjust the number of candidates.
 #there is a tradeoff between the coverage and the correctness of constraints. 
+cutoff1 = 0.9
+cutoff2 = 0.5
 cans <- data.frame()
 for (k in 1:length(genelist)) {
   gene <- genelist[k]
@@ -77,10 +80,10 @@ for (k in 1:length(genelist)) {
     g_[i] <- mean(g[ind])
   } # genes are smoothed by the spatially neighbor cells
   if(att[k]==1){ # get high (1) or low (2) expression cells
-    cutoff <- quantile(g_, 0.95)
-    hit <- ifelse(g_>cutoff,1,0)}
+    cutoff <- quantile(g_, cutoff1) #cutoff1
+    hit <- ifelse(g_>cutoff,1,0)} 
   else{
-    cutoff <- quantile(g_, 0.10)
+    cutoff <- quantile(g_, 1-cutoff1) #cutoff1
     hit <- ifelse(g_<cutoff,1,0)
   }
   
@@ -90,7 +93,7 @@ for (k in 1:length(genelist)) {
     hit_ <- hit[neb==1]
     rate[i] <- sum(hit_)/length(hit_)
   }
-  hit2 <- ifelse(rate>0.5,1,0) #cutoff 2
+  hit2 <- ifelse(rate>cutoff2,1,0) #cutoff 2
   if(sum(hit2)==0){
     next
   }
@@ -132,23 +135,8 @@ cl_df <- t(apply(cl_df, 1, sort))
 ml_df <- ml_df[!duplicated(ml_df),]
 cl_df <- cl_df[!duplicated(cl_df),]
 
-#check the accuracy of constraints when the true labels are available
-if(!is.null(y)){
-   check_labels1 <- function(cells){
-     sum(y[cells[1]]==y[cells[2]])
-     }
-
-   check_labels2 <- function(cells){
-     sum(y[cells[1]]!=y[cells[2]])
-     }
-
-   print(sum(apply(ml_df, 1, check_labels1))/nrow(ml_df))
-   print(sum(apply(cl_df, 1, check_labels2))/nrow(cl_df))
-}
-
 write.table(ml_df,paste0("sample_",sample,"_mlFromMarks.txt"), col.names = F,row.names = F,quote = F)
 write.table(cl_df,paste0("sample_",sample,"_clFromMarks.txt"), col.names = F,row.names = F,quote = F)
-
 
 ###########################################################################
 ##################check the pattern of smoothed gene expression#######
