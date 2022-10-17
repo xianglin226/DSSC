@@ -1,7 +1,7 @@
 # DSSC
 A model-based constrained deep learning clustering approach for spatial-resolved single-cell data
 
-# Packages
+# Dependencies in Python  
 Python 3.8.1
 
 Pytorch 1.6.0
@@ -25,6 +25,15 @@ All experiments of DSSC in this study are conducted on Nvidia Tesla P100 (16G) G
 (2) "Y" - true labels (if available)  
 (3) "Pos" - spatial coordinate  
 (4) "Genes" - feature names (Use to build constraints)  
+
+# Dependencies in R
+R 4.1.0  
+
+Seurat 4.2.0  
+
+cccd 1.5  
+
+rhdf5 2.38.1  
 
 # Run DSSC 
 1) Build constraints (See make_links_from_Markers.R)  
