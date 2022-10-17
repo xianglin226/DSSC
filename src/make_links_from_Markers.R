@@ -1,7 +1,6 @@
 library(ggplot2)
 library(Seurat)
 library(rhdf5)
-library(openxlsx)
 library(cccd)
 
 ##read data
