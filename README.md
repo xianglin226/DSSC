@@ -1,6 +1,8 @@
 # DSSC
 A model-based constrained deep learning clustering approach for spatial-resolved single-cell data
 
+![alt text](https://github.com/xianglin226/DSSC/blob/master/src/fig1_structure.tif?raw=true)  
+
 # Dependencies in Python  
 Python 3.8.1
 
