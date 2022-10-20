@@ -7,14 +7,14 @@ library(cccd)
 #load data prepared in h5 format
 dat <- H5Fopen(paste0("../sample_data/sample_151507_anno.h5"))
 
-#X is count matrix; Y is the label; Pos is the spatial coordinates.
+#X is count matrix; Y is the true label (used for remove NA cells); Pos is the spatial coordinates.
 y <- dat$Y
 genes <- dat$Gene
 x <- dat$X
 rownames(x) <- genes
 pos <- dat$Pos
 
-#Filter out the spots with NA labels (this is only for the spatialLIBD data)
+#Filter out the spots with NA labels (provided by the author; this is only for the spatialLIBD data)
 f <- is.na(y)
 x <- x[,!f]
 y <- y[!f]
