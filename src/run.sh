@@ -6,7 +6,7 @@
 module purge
 conda activate /home/x/xl456/miniconda3_1/envs/torch_py38
 
-f=../sample_data/sample_151507_anno.h5
+f=../data/sample_151507_anno.h5
 for i in {1..5}
  do
 python -u run_DSSC.py --n_clusters -1 --data_file $f --save_dir out_151507 \
@@ -14,7 +14,7 @@ python -u run_DSSC.py --n_clusters -1 --data_file $f --save_dir out_151507 \
 --ml_file ../example_constraints/sample_151507_mlFromMarks_test.txt --cl_file ../example_constraints/sample_151507_clFromMarks_test.txt
  done
 
-f=../sample_data/osmFISH_cortex.h5
+f=../data/osmFISH_cortex.h5
 for i in {1..5}
  do
 python -u run_DSSC.py --n_clusters -1 --data_file $f --save_dir out_osmFISH \
