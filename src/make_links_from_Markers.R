@@ -5,7 +5,7 @@ library(cccd)
 
 ##read data
 #load data prepared in h5 format
-dat <- H5Fopen(paste0("../sample_data/sample_151507_anno.h5"))
+dat <- H5Fopen("../sample_data/sample_151507_anno.h5")
 
 #X is count matrix; Y is the true label (used for remove NA cells); Pos is the spatial coordinates.
 y <- dat$Y
@@ -134,8 +134,8 @@ cl_df <- t(apply(cl_df, 1, sort))
 ml_df <- ml_df[!duplicated(ml_df),]
 cl_df <- cl_df[!duplicated(cl_df),]
 
-write.table(ml_df,paste0("sample_",sample,"_mlFromMarks.txt"), col.names = F,row.names = F,quote = F)
-write.table(cl_df,paste0("sample_",sample,"_clFromMarks.txt"), col.names = F,row.names = F,quote = F)
+write.table(ml_df,"sample_151507_mlFromMarks.txt", col.names = F,row.names = F,quote = F)
+write.table(cl_df,"sample_151507_clFromMarks.txt", col.names = F,row.names = F,quote = F)
 
 ###########################################################################
 ##################check the pattern of smoothed gene expression#######
