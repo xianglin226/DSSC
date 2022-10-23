@@ -65,9 +65,9 @@ for (i in genelist) {
 }
 
 ############################################################
-#make link candidates, the cutoff value (0.9 and 0.5) can be changed to adjust the number of candidates.
+#make link candidates, the cutoff value (0.95 and 0.5) can be changed to adjust the number of candidates.
 #there is a tradeoff between the coverage and the correctness of constraints. 
-cutoff1 = 0.9
+cutoff1 = 0.95
 cutoff2 = 0.5
 cans <- data.frame()
 for (k in 1:length(genelist)) {
