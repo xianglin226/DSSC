@@ -41,3 +41,6 @@ ggplot2 3.3.6
 # Run DSSC 
 1) Build constraints (See make_links_from_Markers.R)  
 2) Run DSSC (See run_DSSC.sh, then run.sh)  
+
+# Cite this work  
+Lin, X., Gao, L., Whitener, N., Ahmed, A., & Wei, Z. (2022). A model-based constrained deep learning clustering approach for spatially resolved single-cell data. Genome Research, 32(10), 1906-1917.
